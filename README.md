@@ -49,6 +49,18 @@ contract rather than a broad monolith-style API.
 
 ---
 
+## Shared Governance
+
+| Area               | Tooling                                        |
+| ------------------ | ---------------------------------------------- |
+| Dependency updates | Renovate                                       |
+| Issue intake       | GitHub issue templates                         |
+| Change review      | Pull request template                          |
+| Repo hygiene       | Pre-commit baseline                            |
+| Delivery model     | Draft-only until the full scaffold is in place |
+
+---
+
 ## Boundary vs Monolith
 
 | Dimension          | `fastapi-template-monolith`          | `fastapi-template-microservice`       |
@@ -95,6 +107,7 @@ Use `fastapi-template-monolith` instead for broad application APIs.
 | `fastapi-template-monolith`    | FastAPI single-service API |
 | `nest-template-microservice`   | NestJS equivalent          |
 | `nest-template-monolith`       | NestJS single-service API  |
+| `react-template-next`          | Next.js frontend           |
 
 ---
 
