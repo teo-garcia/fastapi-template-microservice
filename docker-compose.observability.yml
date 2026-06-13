@@ -1,0 +1,15 @@
+services:
+  app:
+    environment:
+      OTEL_ENABLED: "true"
+      OTEL_SERVICE_NAME: fastapi-template-microservice
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+    networks:
+      observability:
+        aliases:
+          - fastapi-template-microservice
+
+networks:
+  observability:
+    name: templates-observability
+    external: true

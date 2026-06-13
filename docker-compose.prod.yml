@@ -1,0 +1,77 @@
+services:
+  db:
+    ports: !reset []
+    volumes: !override
+      - postgres_data:/var/lib/postgresql
+
+  redis:
+    ports: !reset []
+
+  nats:
+    ports: !reset []
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      APP_NAME: ${APP_NAME:-FastAPI Microservice Template}
+      APP_VERSION: ${APP_VERSION:-1}
+      DEBUG: "false"
+      API_PREFIX: ${API_PREFIX:-/api/v1}
+      SHUTDOWN_TIMEOUT: ${SHUTDOWN_TIMEOUT:-10}
+      DATABASE_URL: postgresql+asyncpg://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres}@db:5432/${DATABASE_NAME:-fastapi_microservice}
+      DATABASE_ECHO: "false"
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-10}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_TTL: ${REDIS_TTL:-3600}
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      NATS_CLIENT_NAME: ${NATS_CLIENT_NAME:-fastapi-template-microservice}
+      NATS_SUBJECT_PREFIX: ${NATS_SUBJECT_PREFIX:-templates}
+      NATS_STREAM_PREFIX: ${NATS_STREAM_PREFIX:-template}
+      NATS_TIMEOUT: ${NATS_TIMEOUT:-5}
+      NATS_ACK_WAIT_SECONDS: ${NATS_ACK_WAIT_SECONDS:-30}
+      NATS_MAX_MESSAGES: ${NATS_MAX_MESSAGES:-10000}
+      NATS_MAX_DELIVER: ${NATS_MAX_DELIVER:-3}
+      NATS_MAX_RECONNECT_ATTEMPTS: ${NATS_MAX_RECONNECT_ATTEMPTS:-10}
+      NATS_RECONNECT_TIME_WAIT: ${NATS_RECONNECT_TIME_WAIT:-2}
+      PORT: ${PORT:-8000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_JSON: "true"
+      CORS_ENABLED: ${CORS_ENABLED:-true}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Set CORS_ORIGIN to the deployed frontend origin}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-100/minute}
+      METRICS_ENABLED: ${METRICS_ENABLED:-true}
+    ports: !reset []
+    volumes: !reset []
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: fastapi_microservice_nginx
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost/health/live || exit 1",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - fastapi-network
+
+  pgadmin:
+    profiles:
+      - local-tools

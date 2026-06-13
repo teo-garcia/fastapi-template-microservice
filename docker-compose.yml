@@ -1,0 +1,160 @@
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: fastapi_microservice_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: ${DATABASE_NAME:-fastapi_microservice}
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - fastapi-network
+
+  redis:
+    image: redis:alpine
+    container_name: fastapi_microservice_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    command:
+      - sh
+      - -c
+      - |
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+        fi
+        exec redis-server --appendonly yes
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'if [ -n "$$REDIS_PASSWORD" ]; then redis-cli --pass "$$REDIS_PASSWORD" ping; else redis-cli ping; fi',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - fastapi-network
+
+  nats:
+    image: nats:2.11-alpine
+    container_name: fastapi_microservice_nats
+    restart: unless-stopped
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "${NATS_PORT:-4222}:4222"
+      - "${NATS_MONITOR_PORT:-8222}:8222"
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - fastapi-network
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: fastapi_microservice_app
+    restart: unless-stopped
+    environment:
+      APP_NAME: FastAPI Microservice Template
+      APP_VERSION: 1
+      DEBUG: "true"
+      API_PREFIX: /api/v1
+      SHUTDOWN_TIMEOUT: 10
+      DATABASE_URL: postgresql+asyncpg://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres}@db:5432/${DATABASE_NAME:-fastapi_microservice}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_TTL: 3600
+      NATS_URL: nats://nats:4222
+      NATS_CLIENT_NAME: fastapi-template-microservice
+      NATS_SUBJECT_PREFIX: templates
+      NATS_STREAM_PREFIX: template
+      NATS_TIMEOUT: 5
+      NATS_ACK_WAIT_SECONDS: 30
+      NATS_MAX_MESSAGES: 10000
+      NATS_MAX_DELIVER: 3
+      NATS_MAX_RECONNECT_ATTEMPTS: 10
+      NATS_RECONNECT_TIME_WAIT: 2
+      PORT: 8000
+      LOG_LEVEL: info
+      LOG_JSON: "false"
+      CORS_ENABLED: "true"
+      CORS_ORIGIN: http://localhost:3000
+      THROTTLE_LIMIT: 100/minute
+      METRICS_ENABLED: "true"
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - ./app:/code/app
+      - ./alembic:/code/alembic
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import httpx; r = httpx.get('http://localhost:8000/health/live'); exit(0 if r.status_code == 200 else 1)",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+    networks:
+      - fastapi-network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: fastapi_microservice_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - db
+    networks:
+      - fastapi-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  nats_data:
+  pgadmin_data:
+
+networks:
+  fastapi-network:
+    driver: bridge

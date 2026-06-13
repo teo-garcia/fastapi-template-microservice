@@ -9,7 +9,8 @@ integration-focused services**
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![uv](https://img.shields.io/badge/uv-package%20manager-DE5FE9)](https://docs.astral.sh/uv/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Redis](https://img.shields.io/badge/Redis-Messaging-DC382D?logo=redis&logoColor=white)](https://redis.io)
+[![NATS](https://img.shields.io/badge/NATS-JetStream-27AAE1)](https://nats.io)
+[![Redis](https://img.shields.io/badge/Redis-Cache%20%2F%20Rate%20Limit-DC382D?logo=redis&logoColor=white)](https://redis.io)
 
 Part of the [@teo-garcia/templates](https://github.com/teo-garcia/templates)
 ecosystem
@@ -23,11 +24,11 @@ ecosystem
 | Category          | Technologies                                              |
 | ----------------- | --------------------------------------------------------- |
 | **Framework**     | FastAPI with explicit service boundaries                  |
-| **Messaging**     | Event-driven or broker-based communication first-class    |
+| **Messaging**     | NATS JetStream boundary with governed stack interop       |
 | **Persistence**   | Service-owned data model with isolated storage boundaries |
 | **Observability** | Health checks, metrics, structured logging, trace propagation |
-| **Testing**       | HTTP contract, worker flow, and messaging integration coverage |
-| **Code Quality**  | Planned ruff, mypy, pre-commit baseline                   |
+| **Testing**       | pytest, stack health checks, and NATS smoke coverage      |
+| **Code Quality**  | Ruff, mypy, pre-commit baseline                           |
 
 ---
 
@@ -37,15 +38,17 @@ ecosystem
 - uv (package manager)
 - Docker and Docker Compose
 - PostgreSQL
-- Redis or another broker transport
+- Redis
+- NATS with JetStream enabled
 
 ---
 
 ## Status
 
-This repository defines the template boundary but is not fully scaffolded yet.
-Clone it and use the README as a starting point for a narrow microservice
-contract rather than a broad monolith-style API.
+This repository is active and scaffolded from the FastAPI monolith operational
+baseline, then narrowed for bounded microservice work. It includes HTTP
+endpoints, PostgreSQL, Redis, observability, health checks, and a NATS JetStream
+messaging boundary.
 
 ---
 
@@ -57,7 +60,7 @@ contract rather than a broad monolith-style API.
 | Issue intake       | GitHub issue templates                         |
 | Change review      | Pull request template                          |
 | Repo hygiene       | Pre-commit baseline                            |
-| Delivery model     | Draft-only until the full scaffold is in place |
+| Delivery model     | Local stack through `microservices-template-stack` |
 
 ---
 
@@ -79,24 +82,32 @@ contract rather than a broad monolith-style API.
 - The service publishes or consumes events
 - The service belongs to a larger distributed system
 - Failure isolation and independent scaling matter
-- You need the FastAPI equivalent of `nest-template-microservice`
-
 Use `fastapi-template-monolith` instead for broad application APIs.
 
 ---
 
-## Tooling Comparison (NestJS Parity)
+## Local Stack Verification
 
-| NestJS                       | FastAPI                      | Role            |
-| ---------------------------- | ---------------------------- | --------------- |
-| pnpm                         | uv                           | Package manager |
-| ESLint + Prettier            | ruff                         | Lint + format   |
-| tsc --noEmit                 | mypy                         | Type checking   |
-| Jest                         | pytest                       | Testing         |
-| `@nestjs/microservices`      | broker adapter + consumers   | Messaging       |
-| Prisma                       | SQLAlchemy + Alembic         | ORM + migrations |
-| Winston                      | structlog                    | Logging         |
-| prom-client                  | prometheus-client            | Metrics         |
+Run the governed multi-service stack from the portfolio root:
+
+```bash
+docker compose -f microservices-template-stack/docker-compose.yml up --build -d
+curl -fsS http://localhost:8000/health/ready
+node microservices-template-stack/smoke/nats-template-interop-smoke.mjs
+```
+
+The readiness endpoint checks PostgreSQL, Redis, and NATS JetStream. Concrete
+cross-service interop proofs live in the stack harness, not in this template's
+application code.
+
+---
+
+## Production Boundaries
+
+This template is production-oriented, but it is not a complete production
+platform by itself. Before deploying a real service, define the auth boundary,
+secrets source, ingress/API gateway, event catalog, tracing backend, deployment
+topology, and release process for the target environment.
 
 ---
 
@@ -105,8 +116,6 @@ Use `fastapi-template-monolith` instead for broad application APIs.
 | Template                       | Description                |
 | ------------------------------ | -------------------------- |
 | `fastapi-template-monolith`    | FastAPI single-service API |
-| `nest-template-microservice`   | NestJS equivalent          |
-| `nest-template-monolith`       | NestJS single-service API  |
 | `react-template-next`          | Next.js frontend           |
 
 ---
