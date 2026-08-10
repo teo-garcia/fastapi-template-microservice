@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 from pytest import MonkeyPatch
@@ -22,6 +23,56 @@ def test_nats_naming_uses_governed_prefixes(monkeypatch: MonkeyPatch) -> None:
         assert service.get_consumer_name("order-service") == "order-service"
     finally:
         get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_stream_and_consumer_configuration_is_reconciled(monkeypatch: MonkeyPatch) -> None:
+    service = NatsJetStreamService()
+    jetstream = AsyncMock()
+    monkeypatch.setattr(service, "jetstream", AsyncMock(return_value=jetstream))
+
+    stream_name = await service.ensure_stream("orders:created")
+
+    assert stream_name == "TEMPLATE_ORDERS_CREATED"
+    jetstream.stream_info.assert_awaited_once_with(stream_name)
+    stream_config = jetstream.update_stream.await_args.args[0]
+    assert stream_config.name == stream_name
+    assert stream_config.subjects == ["templates.orders.created", "templates.orders.created.dlq"]
+
+    monkeypatch.setattr(service, "ensure_stream", AsyncMock(return_value=stream_name))
+    consumer_name = await service.ensure_consumer("orders:created", "order-service")
+
+    assert consumer_name == "order-service"
+    jetstream.consumer_info.assert_awaited_once_with(stream_name, consumer_name)
+
+
+@pytest.mark.asyncio
+async def test_health_and_close_cover_success_and_failure_paths(monkeypatch: MonkeyPatch) -> None:
+    disconnected_service = NatsJetStreamService()
+    await disconnected_service.close()
+    monkeypatch.setattr(disconnected_service, "connect", AsyncMock())
+    with pytest.raises(RuntimeError, match="JetStream context is unavailable"):
+        await disconnected_service.jetstream()
+
+    service = NatsJetStreamService()
+    jetstream = AsyncMock()
+    monkeypatch.setattr(service, "jetstream", AsyncMock(return_value=jetstream))
+
+    assert await service.is_healthy() is True
+    jetstream.account_info.assert_awaited_once()
+
+    monkeypatch.setattr(service, "jetstream", AsyncMock(side_effect=RuntimeError("unavailable")))
+    assert await service.is_healthy() is False
+
+    client = AsyncMock()
+    service._client = client
+    service._jetstream = jetstream
+    await service.close()
+
+    client.drain.assert_awaited_once()
+    client.close.assert_awaited_once()
+    assert service._client is None
+    assert service._jetstream is None
 
 
 @pytest.mark.asyncio
