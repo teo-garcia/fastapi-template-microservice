@@ -116,7 +116,7 @@ topology, and release process for the target environment.
 | Template                       | Description                |
 | ------------------------------ | -------------------------- |
 | `fastapi-template-monolith`    | FastAPI single-service API |
-| `react-template-next`          | Next.js frontend           |
+| `next-template-fullstack`      | Next.js full-stack app     |
 
 ---
 
