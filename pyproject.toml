@@ -2,7 +2,7 @@
 name = "fastapi-template-microservice"
 version = "0.0.0"
 description = "FastAPI microservice template with PostgreSQL, Redis, observability, and production-grade tooling"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.14,<3.15"
 license = "MIT"
 authors = [{ name = "teo-garcia" }]
 dependencies = [
